@@ -9,8 +9,7 @@ import { expenseCategories, transactionTypes } from '@/constants/data'
 import { colors, radius, spacingX, spacingY } from '@/constants/theme'
 import { useAuth } from '@/contexts/authContext'
 import useFetchData from '@/hooks/useFetchData'
-import { createOrUpdateTransaction } from '@/services/transactionService'
-import { deleteTransaction } from '@/services/walletService'
+import { createOrUpdateTransaction, deleteTransaction } from '@/services/transactionService'
 import { TransactionType, WalletType } from '@/types'
 import { scale, verticalScale } from '@/utils/styling'
 import DateTimePicker from '@react-native-community/datetimepicker'
@@ -38,27 +37,29 @@ const TransactionModal = () => {
     const [showDatePicker, setShowDatePicker] = useState(false);
     const router = useRouter();
 
-    const oldTransaction: { 
+    type paramType = { 
+        id: string,
         type: string,
         amount: number,
-        description: string,
-        category: string,
+        category?: string,
         date: string,
+        description?: string,
+        image?: string, 
+        uid?: string,
         walletId: string,
-        image: string, 
-        id: string 
-    } = useLocalSearchParams();
+    };
+    const oldTransaction: paramType  = useLocalSearchParams();
 
     useEffect(() => {
         if(oldTransaction?.id) {
             setTransaction({
                 type: oldTransaction?.type,
-                amount: oldTransaction?.amount,
-                description: oldTransaction?.description,
-                category: oldTransaction?.category,
-                date: oldTransaction?.date,
-                walletId: oldTransaction?.walletId,
-                image: oldTransaction?.image
+                amount: Number(oldTransaction.amount),
+                category: oldTransaction.category || '',
+                date: new Date(oldTransaction.date),
+                description: oldTransaction.description || '',
+                image: oldTransaction?.image,
+                walletId: oldTransaction.walletId,
             })
         }
     }, [])
@@ -72,9 +73,11 @@ const TransactionModal = () => {
         }
 
         let transactionData: TransactionType = {
-            type, amount, description, category, date, walletId, image, uid: user?.uid
+            type, amount, description, category, date, walletId, image: image ? image : null, uid: user?.uid
         };
 
+        if(oldTransaction?.id) transactionData.id = oldTransaction.id;
+        
         setIsLoading(true);
         const res = await createOrUpdateTransaction(transactionData);
         setIsLoading(false);
@@ -89,7 +92,7 @@ const TransactionModal = () => {
     const onDelete = async () => {
         if(!oldTransaction?.id) return;
         setIsLoading(true);
-        const res = await deleteTransaction(oldTransaction?.id);
+        const res = await deleteTransaction(oldTransaction?.id, oldTransaction.walletId);
         setIsLoading(false);
 
         if(res.success) {
@@ -100,7 +103,7 @@ const TransactionModal = () => {
     }
 
     const showDeleteAlert = () => {
-        Alert.alert('Confirm', 'Are you sure to delete this? \nThis action will remove all the transaction in the wallet', [
+        Alert.alert('Confirm', 'Are you sure to delete this transaction?', [
             {
                 text: 'Cancel',
                 onPress: () => console.log('Cancel delete'),
